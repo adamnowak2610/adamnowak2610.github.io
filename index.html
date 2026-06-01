@@ -532,7 +532,7 @@
 <main>
     <header>
         <h1>Polskie Wordle 4×4</h1>
-        <p class="subtitle">16 słów, jedno zgadywanie, 20 prób.</p>
+        <p class="subtitle">16 słów, jedno zgadywanie, 21 prób.</p>
         <section class="mode-tabs">
             <button id="daily-mode-button" type="button" class="active" onclick="startDailyMode()">Daily</button>
             <button id="practice-mode-button" type="button" onclick="startPracticeMode()">Practice</button>
@@ -561,7 +561,7 @@
 <script>
     const WORD_LENGTH = 5;
     const BOARD_COUNT = 16;
-    const MAX_ATTEMPTS = 20;
+    const MAX_ATTEMPTS = 21;
 
     /*
         1 = pokazuje tylko wykonane próby + aktualny rząd.
@@ -1456,7 +1456,7 @@
             `Daily wordle #${puzzleNumber}`,
             `Guesses: ${attempts.length}/${MAX_ATTEMPTS}`,
             rows.join("\n"),
-            "https://astroksiezyc.pl/wordle"
+            "https://www.astroksiezyc.pl/wordle"
         ].join("\n");
     }
 
