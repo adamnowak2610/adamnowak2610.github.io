@@ -574,6 +574,9 @@
     const MODE_DAILY = "daily";
     const MODE_PRACTICE = "practice";
 
+    // API na OVH. Tam powinien leżeć daily.php razem z answers5.txt, used_words.txt i daily_sets.json.
+    const DAILY_WORDS_API_URL = "https://astroksiezyc.pl/wordle-api/daily.php";
+
     const BOARDS_CONTAINER = document.getElementById("boards");
     const KEYBOARD_CONTAINER = document.getElementById("keyboard");
     const MESSAGE = document.getElementById("message");
@@ -676,6 +679,40 @@
         };
     }
 
+    async function fetchDailyWordsFromApi(dateKey) {
+        const url = new URL(DAILY_WORDS_API_URL);
+        url.searchParams.set("count", String(BOARD_COUNT));
+        url.searchParams.set("date", dateKey);
+
+        const response = await fetch(url.toString(), {
+            method: "GET",
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error(`API dziennych słów zwróciło błąd HTTP ${response.status}.`);
+        }
+
+        const data = await response.json();
+
+        if (!data || !Array.isArray(data.words)) {
+            throw new Error("API dziennych słów zwróciło niepoprawny format JSON.");
+        }
+
+        const words = data.words
+            .map(normalizeWord)
+            .filter(word => [...word].length === WORD_LENGTH)
+            .filter(word => /^[a-ząćęłńóśźż]+$/iu.test(word));
+
+        const uniqueWords = [...new Set(words)];
+
+        if (uniqueWords.length !== BOARD_COUNT) {
+            throw new Error(`API powinno zwrócić ${BOARD_COUNT} unikalnych słów, a zwróciło ${uniqueWords.length}.`);
+        }
+
+        return uniqueWords;
+    }
+
     function pickDailyWords(allWords, dateKey) {
         const seed = hashStringToNumber(dateKey);
         const random = seededRandom(seed);
@@ -712,7 +749,7 @@
 
             loadUiSettings();
             applyUiSettings();
-            startDailyMode();
+            await startDailyMode();
 
             window.addEventListener("keydown", handlePhysicalKeyboard);
             window.addEventListener("resize", applyUiSettings);
@@ -722,11 +759,37 @@
         }
     }
 
-    function startDailyMode() {
+    async function startDailyMode() {
         gameMode = MODE_DAILY;
         endScreenShown = false;
+        gameOver = false;
+        currentGuess = "";
         puzzleDate = getDateKey();
-        dailyWords = pickDailyWords(allAnswerWords, puzzleDate);
+
+        updateModeButtons();
+        hideResultPanel();
+        showMessage("Pobieram dzisiejsze słowa...");
+
+        try {
+            dailyWords = await fetchDailyWordsFromApi(puzzleDate);
+        } catch (err) {
+            console.error(err);
+            attempts = [];
+            boardStates = [];
+            keyStatuses = new Map();
+            activeBoardIndex = 0;
+            dailyWords = [];
+            BOARDS_CONTAINER.innerHTML = "";
+            PROGRESS_STRIP.innerHTML = "";
+            TOP_INFO.textContent = `Daily: ${puzzleDate} · błąd pobierania słów`;
+            updateCurrentGuess();
+            renderKeyboard();
+            showMessage(`Nie udało się pobrać dzisiejszych słów: ${err.message}`);
+            return;
+        }
+
+        // Słowa z API też dopuszczamy jako poprawne odpowiedzi, nawet jeśli lokalny answers5.txt jest nieaktualny.
+        dailyWords.forEach(word => allAllowedWords.add(word));
 
         const savedProgress = loadDailyProgress(puzzleDate, dailyWords);
 
@@ -751,6 +814,7 @@
         renderBoards();
         renderKeyboard();
         updateCurrentGuess();
+        showMessage("");
 
         if (gameOver) {
             showEndScreen();
