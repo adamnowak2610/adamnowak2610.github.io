@@ -532,7 +532,7 @@
 <main>
     <header>
         <h1>Polskie Wordle 4×4</h1>
-        <p class="subtitle">16 słów, jedno zgadywanie, 21 prób.</p>
+        <p class="subtitle">16 słów, jedno zgadywanie, 20 prób.</p>
         <section class="mode-tabs">
             <button id="daily-mode-button" type="button" class="active" onclick="startDailyMode()">Daily</button>
             <button id="practice-mode-button" type="button" onclick="startPracticeMode()">Practice</button>
@@ -561,7 +561,7 @@
 <script>
     const WORD_LENGTH = 5;
     const BOARD_COUNT = 16;
-    const MAX_ATTEMPTS = 21;
+    const MAX_ATTEMPTS = 20;
 
     /*
         1 = pokazuje tylko wykonane próby + aktualny rząd.
@@ -573,9 +573,6 @@
     const STORAGE_UI_SETTINGS = "polskie_wordle_4x4_ui_settings";
     const MODE_DAILY = "daily";
     const MODE_PRACTICE = "practice";
-
-    // API na OVH. Tam powinien leżeć daily.php razem z answers5.txt, used_words.txt i daily_sets.json.
-    const DAILY_WORDS_API_URL = "https://astroksiezyc.pl/wordle-api/daily.php";
 
     const BOARDS_CONTAINER = document.getElementById("boards");
     const KEYBOARD_CONTAINER = document.getElementById("keyboard");
@@ -679,40 +676,6 @@
         };
     }
 
-    async function fetchDailyWordsFromApi(dateKey) {
-        const url = new URL(DAILY_WORDS_API_URL);
-        url.searchParams.set("count", String(BOARD_COUNT));
-        url.searchParams.set("date", dateKey);
-
-        const response = await fetch(url.toString(), {
-            method: "GET",
-            cache: "no-store"
-        });
-
-        if (!response.ok) {
-            throw new Error(`API dziennych słów zwróciło błąd HTTP ${response.status}.`);
-        }
-
-        const data = await response.json();
-
-        if (!data || !Array.isArray(data.words)) {
-            throw new Error("API dziennych słów zwróciło niepoprawny format JSON.");
-        }
-
-        const words = data.words
-            .map(normalizeWord)
-            .filter(word => [...word].length === WORD_LENGTH)
-            .filter(word => /^[a-ząćęłńóśźż]+$/iu.test(word));
-
-        const uniqueWords = [...new Set(words)];
-
-        if (uniqueWords.length !== BOARD_COUNT) {
-            throw new Error(`API powinno zwrócić ${BOARD_COUNT} unikalnych słów, a zwróciło ${uniqueWords.length}.`);
-        }
-
-        return uniqueWords;
-    }
-
     function pickDailyWords(allWords, dateKey) {
         const seed = hashStringToNumber(dateKey);
         const random = seededRandom(seed);
@@ -749,7 +712,7 @@
 
             loadUiSettings();
             applyUiSettings();
-            await startDailyMode();
+            startDailyMode();
 
             window.addEventListener("keydown", handlePhysicalKeyboard);
             window.addEventListener("resize", applyUiSettings);
@@ -759,37 +722,11 @@
         }
     }
 
-    async function startDailyMode() {
+    function startDailyMode() {
         gameMode = MODE_DAILY;
         endScreenShown = false;
-        gameOver = false;
-        currentGuess = "";
         puzzleDate = getDateKey();
-
-        updateModeButtons();
-        hideResultPanel();
-        showMessage("Pobieram dzisiejsze słowa...");
-
-        try {
-            dailyWords = await fetchDailyWordsFromApi(puzzleDate);
-        } catch (err) {
-            console.error(err);
-            attempts = [];
-            boardStates = [];
-            keyStatuses = new Map();
-            activeBoardIndex = 0;
-            dailyWords = [];
-            BOARDS_CONTAINER.innerHTML = "";
-            PROGRESS_STRIP.innerHTML = "";
-            TOP_INFO.textContent = `Daily: ${puzzleDate} · błąd pobierania słów`;
-            updateCurrentGuess();
-            renderKeyboard();
-            showMessage(`Nie udało się pobrać dzisiejszych słów: ${err.message}`);
-            return;
-        }
-
-        // Słowa z API też dopuszczamy jako poprawne odpowiedzi, nawet jeśli lokalny answers5.txt jest nieaktualny.
-        dailyWords.forEach(word => allAllowedWords.add(word));
+        dailyWords = pickDailyWords(allAnswerWords, puzzleDate);
 
         const savedProgress = loadDailyProgress(puzzleDate, dailyWords);
 
@@ -814,7 +751,6 @@
         renderBoards();
         renderKeyboard();
         updateCurrentGuess();
-        showMessage("");
 
         if (gameOver) {
             showEndScreen();
@@ -1520,7 +1456,7 @@
             `Daily wordle #${puzzleNumber}`,
             `Guesses: ${attempts.length}/${MAX_ATTEMPTS}`,
             rows.join("\n"),
-            "https://www.astroksiezyc.pl/wordle"
+            "https://astroksiezyc.pl/wordle"
         ].join("\n");
     }
 
